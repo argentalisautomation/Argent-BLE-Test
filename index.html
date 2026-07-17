@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gateway Mesh Control</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --accent: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.15);
+            --green: #34c759;
+            --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --radius: 20px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px 40px;
+            background: radial-gradient(ellipse at 20% 0%, #0f1a2e 0%, #0a0a0c 60%);
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 26px;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+            background: linear-gradient(135deg, #fff 30%, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 28px;
+        }
+
+        /* --- Connect Button --- */
+        .main-btn {
+            background: linear-gradient(135deg, #007aff, #00d2ff);
+            color: #fff;
+            border: none;
+            padding: 16px 44px;
+            font-size: 17px;
+            font-weight: 600;
+            border-radius: 16px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 340px;
+            box-shadow: 0 8px 24px rgba(0, 118, 255, 0.25);
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+        .main-btn:active { transform: scale(0.96); opacity: 0.85; }
+
+        /* --- Status --- */
+        #status {
+            margin-top: 16px;
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        /* --- Device List --- */
+        #deviceList {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        /* --- Device Card --- */
+        .device-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 20px;
+            animation: fadeSlideIn 0.4s ease both;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .device-name {
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .device-badge {
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 8px;
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--accent);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- Switch Row --- */
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+        .switch-row + .switch-row {
+            border-top: 1px solid rgba(255,255,255,0.03);
+        }
+        .switch-label {
+            font-size: 15px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* --- Toggle Switch --- */
+        .toggle-btn {
+            width: 56px;
+            height: 30px;
+            border-radius: 15px;
+            background: #2c2c2e;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Invisible expanded hitbox for mobile tapping */
+        .toggle-btn::after {
+            content: '';
+            position: absolute;
+            top: -15px;
+            bottom: -15px;
+            left: -15px;
+            right: -15px;
+        }
+        .toggle-btn.on {
+            background: linear-gradient(135deg, #30b850, #34c759);
+        }
+        .toggle-knob {
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+        .toggle-btn.on .toggle-knob {
+            transform: translateX(26px);
+        }
+
+        /* --- Action Buttons --- */
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 380px;
+            margin-top: 20px;
+        }
+        .action-btn {
+            flex: 1;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--glass-border);
+            color: var(--text-dim);
+            padding: 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .action-btn:active { transform: scale(0.97); }
+        .action-btn.refresh { color: var(--accent); border-color: rgba(0,210,255,0.2); }
+        .action-btn.danger  { color: #ff4d4d; border-color: rgba(255,77,77,0.2); }
+
+        /* --- Debug Box --- */
+        .debug-box {
+            width: 100%;
+            max-width: 380px;
+            height: 64px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.5);
+            border-radius: 12px;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            padding: 8px;
+            margin-top: 16px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .mode-badge {
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            color: var(--text-dim);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+        /* --- Settings Panel --- */
+        .settings-panel {
+            margin-top: 16px;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 12px;
+        }
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 8px 0;
+            user-select: none;
+        }
+        .settings-content {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .settings-content.expanded {
+            display: flex;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .setting-label {
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+        }
+        .setting-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        .setting-input {
+            width: 60px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 6px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: inherit;
+        }
+        .setting-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .setting-btn:active { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+
+<body>
+    <h1>Gateway Mesh</h1>
+    <div class="subtitle">v0.2 &middot; ESP-NOW + BLE</div>
+
+    <button id="connectBtn" class="main-btn">Connect Gateway</button>
+    <div id="status">Ready</div>
+
+    <div id="deviceList"></div>
+
+    <div class="action-bar" id="actionBar" style="display:none;">
+        <button class="action-btn refresh" onclick="refreshRoster()">⟳ Refresh</button>
+        <button class="action-btn copy-log" onclick="copyLogs()">📋 Copy Logs</button>
+        <button class="action-btn danger" onclick="nuclearReset()">☢ Reset App</button>
+    </div>
+
+    <div id="debugBox" class="debug-box" style="display:none;"></div>
+
+    <script>
+        const APP_VERSION = 'v0.2';
+        const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+        const ROSTER_UUID  = '12345678-1234-5678-1234-56789abcdef1';
+        const COMMAND_UUID = '12345678-1234-5678-1234-56789abcdef2';
+        const STATE_UUID   = '12345678-1234-5678-1234-56789abcdef3';
+
+        let bleDevice, gattServer;
+        let rosterChar, commandChar, stateChar;
+        let devices = []; // [{id, name, numSwitches, states:[]}]
+        let pollTimer = null;
+        let isGattWritePending = false;
+        let gattWriteQueue = [];
+
+        async function queueGattWrite(payload) {
+            return new Promise((resolve, reject) => {
+                gattWriteQueue.push({ payload, resolve, reject });
+                processGattQueue();
+            });
+        }
+
+        async function processGattQueue() {
+            if (isGattWritePending || gattWriteQueue.length === 0) return;
+            isGattWritePending = true;
+            const { payload, resolve, reject } = gattWriteQueue.shift();
+            try {
+                if (commandChar) await commandChar.writeValue(payload);
+                resolve();
+            } catch (e) {
+                reject(e);
+            } finally {
+                isGattWritePending = false;
+                processGattQueue();
+            }
+        }
+
+        const statusEl   = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const deviceList = document.getElementById('deviceList');
+        const actionBar  = document.getElementById('actionBar');
+        const debugBox   = document.getElementById('debugBox');
+
+        function isStandalonePWA() {
+            return window.matchMedia('(display-mode: standalone)').matches ||
+                window.navigator.standalone === true;
+        }
+
+        function debugLog(msg) {
+            debugBox.style.display = 'block';
+            const t = new Date().toLocaleTimeString();
+            debugBox.innerHTML = `[${t}] ${msg}<br>` + debugBox.innerHTML;
+            if (debugBox.innerHTML.length > 3000) debugBox.innerHTML = debugBox.innerHTML.substring(0, 3000);
+        }
+
+        // ============================================================
+        // BLE Connection
+        // ============================================================
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusEl.textContent = 'SCANNING...';
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'ESP32_Gateway' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                statusEl.textContent = 'CONNECTING...';
+                gattServer = await bleDevice.gatt.connect();
+
+                statusEl.textContent = 'DISCOVERING SERVICES...';
+                const service = await gattServer.getPrimaryService(SERVICE_UUID);
+
+                // Get characteristics
+                rosterChar  = await service.getCharacteristic(ROSTER_UUID);
+                commandChar = await service.getCharacteristic(COMMAND_UUID);
+                stateChar   = await service.getCharacteristic(STATE_UUID);
+                debugLog('Characteristics discovered');
+
+                // Subscribe to state notifications
+                try {
+                    await stateChar.startNotifications();
+                    stateChar.addEventListener('characteristicvaluechanged', handleStateNotification);
+                    debugLog('State notifications subscribed');
+                } catch (e) {
+                    debugLog('Notification subscribe failed: ' + e.message);
+                }
+
+                // Start state polling fallback (Android reliability)
+                startStatePolling();
+
+                // Read roster
+                await refreshRoster();
+
+                statusEl.textContent = 'CONNECTED';
+                connectBtn.style.display = 'none';
+                actionBar.style.display = 'flex';
+
+                debugLog('Dashboard active | Mode: ' + (isStandalonePWA() ? 'PWA' : 'Browser'));
+            } catch (err) {
+                statusEl.textContent = 'ERROR: ' + err.message;
+                debugLog('Connect failed: ' + err.message);
+            }
+        });
+
+        function onDisconnected() {
+            statusEl.textContent = 'DISCONNECTED';
+            connectBtn.style.display = 'block';
+            actionBar.style.display = 'none';
+            deviceList.innerHTML = '';
+            devices = [];
+            stopStatePolling();
+            debugLog('Disconnected');
+        }
+
+        // ============================================================
+        // Roster
+        // ============================================================
+        async function refreshRoster() {
+            try {
+                statusEl.textContent = 'READING ROSTER...';
+                const value = await rosterChar.readValue();
+                parseRoster(value);
+                renderDevices();
+                statusEl.textContent = 'CONNECTED · ' + devices.length + ' DEVICE' + (devices.length !== 1 ? 'S' : '');
+                debugLog('Roster: ' + devices.length + ' devices loaded');
+            } catch (e) {
+                debugLog('Roster read failed: ' + e.message);
+                statusEl.textContent = 'ROSTER ERROR';
+            }
+        }
+
+        let isEspnowEnabled = false;
+        let isAutomationEnabled = false;
+
+        function parseRoster(dataView) {
+            const raw = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+            let offset = 0;
+            const numDevices = raw[offset++];
+            const sysFlags = raw[offset++];
+            isEspnowEnabled = (sysFlags & 0x01) !== 0;
+            isAutomationEnabled = (sysFlags & 0x02) !== 0;
+
+            devices = [];
+            for (let d = 0; d < numDevices && offset < raw.length; d++) {
+                const deviceId    = raw[offset++];
+                const numSwitches = raw[offset++];
+                const nameLen     = raw[offset++];
+                const nameBytes   = raw.slice(offset, offset + nameLen);
+                const name        = new TextDecoder().decode(nameBytes);
+                offset += nameLen;
+
+                const states = [];
+                for (let s = 0; s < numSwitches && offset < raw.length; s++) {
+                    states.push(raw[offset++]);
+                }
+
+                const offsetsArr = [];
+                for (let s = 0; s < numSwitches && offset < raw.length; s++) {
+                    offsetsArr.push(raw[offset++]);
+                }
+                
+                let presence = 0, distance = 0;
+                let gate_energies = [];
+                let radar_config = null;
+                if (offset < raw.length) {
+                    presence = raw[offset++];
+                    distance = dataView.getUint16(offset, true); offset += 2;
+                    for (let g = 0; g < 16; g++) {
+                        gate_energies.push(dataView.getUint16(offset, true));
+                        offset += 2;
+                    }
+                    if (offset + 70 <= raw.length) {
+                        radar_config = { move_thresh: [], still_thresh: [] };
+                        radar_config.min_gate = dataView.getUint16(offset, true); offset += 2;
+                        radar_config.max_gate = dataView.getUint16(offset, true); offset += 2;
+                        radar_config.timeout  = dataView.getUint16(offset, true); offset += 2;
+                        for (let g = 0; g < 16; g++) {
+                            radar_config.move_thresh.push(dataView.getUint16(offset, true)); offset += 2;
+                        }
+                        for (let g = 0; g < 16; g++) {
+                            radar_config.still_thresh.push(dataView.getUint16(offset, true)); offset += 2;
+                        }
+                        if (offset + 8 <= raw.length) {
+                        radar_config.auto_masks = [];
+                        for (let d = 0; d < 8; d++) {
+                            radar_config.auto_masks.push(raw[offset++]);
+                        }
+                    }
+                    }
+                }
+
+                devices.push({ id: deviceId, name, numSwitches, states, offsets: offsetsArr, presence, distance, gate_energies, radar_config });
+            }
+        }
+
+        // ============================================================
+        // State Notifications
+        // Packet: [device_id, num_switches, state_0, state_1, ...]
+        // ============================================================
+        function handleStateNotification(event) {
+            const dv = event.target.value;
+            processStatePacket(dv);
+        }
+
+        function processStatePacket(dataView) {
+            if (!dataView || dataView.byteLength < 2) return;
+
+            const deviceId    = dataView.getUint8(0);
+            const numSwitches = dataView.getUint8(1);
+
+            if (dataView.byteLength < 2 + numSwitches) return;
+
+            const dev = devices.find(d => d.id === deviceId);
+            if (!dev) {
+                debugLog('State for unknown device ' + deviceId + ', refreshing roster');
+                refreshRoster();
+                return;
+            }
+
+            for (let s = 0; s < numSwitches; s++) {
+                const newState = dataView.getUint8(2 + s);
+                dev.states[s] = newState;
+
+                // Update toggle UI
+                const toggleEl = document.getElementById(`toggle-${deviceId}-${s}`);
+                if (toggleEl) {
+                    if (newState) toggleEl.classList.add('on');
+                    else toggleEl.classList.remove('on');
+                }
+            }
+
+            // Real-time radar updates
+            if (dataView.byteLength >= 2 + numSwitches + 3) {
+                let offset = 2 + numSwitches;
+                const presence = dataView.getUint8(offset++);
+                const distance = dataView.getUint16(offset, true);
+                
+                dev.presence = presence;
+                dev.distance = distance;
+                
+                const presenceEl = document.getElementById(`toggle-presence-${deviceId}`);
+                if (presenceEl) {
+                    if (presence) {
+                        presenceEl.classList.add('on');
+                    } else {
+                        presenceEl.classList.remove('on');
+                    }
+                }
+                
+                const distEl = document.getElementById(`input-distance-${deviceId}`);
+                if (distEl) {
+                    if (presence) {
+                        distEl.value = distance;
+                    } else {
+                        distEl.value = '';
+                    }
+                }
+            }
+        }
+
+        // Polling fallback for Android reliability
+        pollTimer = null;
+        let pollOk = 0;
+        function startStatePolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(async () => {
+                if (!stateChar || !gattServer || !gattServer.connected) {
+                    stopStatePolling();
+                    return;
+                }
+                try {
+                    const value = await stateChar.readValue();
+                    pollOk++;
+                    processStatePacket(value);
+                } catch (e) {
+                    // Silently retry
+                }
+            }, 500);
+        }
+
+        function stopStatePolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+
+        // ============================================================
+        // Send Toggle Command: [device_id, switch_id, new_state]
+        // ============================================================
+        async function sendToggle(deviceId, switchId) {
+            const dev = devices.find(d => d.id === deviceId);
+            if (!dev) return;
+
+            const newState = dev.states[switchId] ? 0 : 1;
+
+            // Optimistic UI update
+            dev.states[switchId] = newState;
+            const toggleEl = document.getElementById(`toggle-${deviceId}-${switchId}`);
+            if (toggleEl) {
+                if (newState) toggleEl.classList.add('on');
+                else toggleEl.classList.remove('on');
+            }
+
+            try {
+                const payload = new Uint8Array([deviceId, switchId, newState]);
+                await queueGattWrite(payload);
+                debugLog(`CMD: dev=${deviceId} sw=${switchId} → ${newState}`);
+            } catch (e) {
+                debugLog('CMD failed: ' + e.message);
+                // Revert optimistic update
+                dev.states[switchId] = newState ? 0 : 1;
+                if (toggleEl) toggleEl.classList.toggle('on');
+            }
+        }
+
+        async function setThreshold(deviceId, switchId) {
+            const inputEl = document.getElementById(`offset-${deviceId}-${switchId}`);
+            if (!inputEl) return;
+            const offset = parseInt(inputEl.value, 10);
+            if (isNaN(offset) || offset < 10 || offset > 250) {
+                alert("Offset must be between 10 and 250");
+                return;
+            }
+
+            try {
+                // Command format: [device_id, 0xFE, target_switch_id, new_offset_value]
+                const payload = new Uint8Array([deviceId, 0xFE, switchId, offset]);
+                await queueGattWrite(payload);
+                debugLog(`CMD: Settings dev=${deviceId} sw=${switchId} -> offset=${offset}`);
+                // Give visual feedback
+                const btn = inputEl.nextElementSibling;
+                const oldText = btn.innerText;
+                btn.innerText = "✓";
+                setTimeout(() => btn.innerText = oldText, 1000);
+            } catch (e) {
+                debugLog('Settings CMD failed: ' + e.message);
+                alert('Failed to save: ' + e.message);
+            }
+        }
+        
+        async function sendRadarCommand(deviceId, cmdId) {
+            try {
+                const payload = new Uint8Array([deviceId, cmdId, 0, 0]);
+                await queueGattWrite(payload);
+                await refreshRoster();
+                debugLog(`CMD: Radar dev=${deviceId} action=${cmdId.toString(16)}`);
+                alert('Radar command successfully applied!');
+            } catch (e) {
+                debugLog('Radar CMD failed: ' + e.message);
+                alert('Failed to send Radar command: ' + e.message);
+            }
+        }
+        
+        async function sendRadarBasic(deviceId) {
+            const minGate = parseInt(document.getElementById(`min-gate-${deviceId}`).value, 10);
+            const maxGate = parseInt(document.getElementById(`max-gate-${deviceId}`).value, 10);
+            const timeout = parseInt(document.getElementById(`timeout-${deviceId}`).value, 10);
+            const btn = document.getElementById(`btn-radar-basic-${deviceId}`);
+            
+            if (isNaN(minGate) || isNaN(maxGate) || isNaN(timeout)) {
+                alert("Please enter valid numbers"); return;
+            }
+            
+            try {
+                if (btn) btn.disabled = true;
+                const payload = new Uint8Array(8);
+                payload[0] = deviceId;
+                payload[1] = 0xF8;
+                payload[2] = minGate & 0xFF; payload[3] = (minGate >> 8) & 0xFF;
+                payload[4] = maxGate & 0xFF; payload[5] = (maxGate >> 8) & 0xFF;
+                payload[6] = timeout & 0xFF; payload[7] = (timeout >> 8) & 0xFF;
+                
+                await queueGattWrite(payload);
+                await refreshRoster();
+                debugLog(`CMD: Radar Basic dev=${deviceId} min=${minGate} max=${maxGate} time=${timeout}`);
+                if (btn) {
+                    const old = btn.innerText; 
+                    btn.innerText = "✓ Applied & Verified"; 
+                    setTimeout(() => { btn.innerText = old; btn.disabled = false; }, 1500);
+                }
+            } catch (e) {
+                if (btn) btn.disabled = false;
+                alert('Failed: ' + e.message);
+            }
+        }
+        
+        async function sendRadarThresh(deviceId) {
+            const gate = parseInt(document.getElementById(`gate-sel-${deviceId}`).value, 10);
+            const move = parseInt(document.getElementById(`move-th-${deviceId}`).value, 10);
+            const still = parseInt(document.getElementById(`still-th-${deviceId}`).value, 10);
+            const btn = document.getElementById(`btn-radar-thresh-${deviceId}`);
+            
+            if (isNaN(move) || isNaN(still)) {
+                alert("Please enter valid numbers"); return;
+            }
+            
+            try {
+                if (btn) btn.disabled = true;
+                const payload = new Uint8Array(11);
+                payload[0] = deviceId;
+                payload[1] = 0xF7;
+                payload[2] = gate;
+                payload[3] = move & 0xFF; payload[4] = (move >> 8) & 0xFF; payload[5] = (move >> 16) & 0xFF; payload[6] = (move >> 24) & 0xFF;
+                payload[7] = still & 0xFF; payload[8] = (still >> 8) & 0xFF; payload[9] = (still >> 16) & 0xFF; payload[10] = (still >> 24) & 0xFF;
+                
+                await queueGattWrite(payload);
+                await refreshRoster();
+                debugLog(`CMD: Radar Thresh dev=${deviceId} gate=${gate} move=${move} still=${still}`);
+                if (btn) {
+                    const old = btn.innerText; 
+                    btn.innerText = "✓ Applied & Verified"; 
+                    setTimeout(() => { btn.innerText = old; btn.disabled = false; }, 1500);
+                }
+            } catch (e) {
+                if (btn) btn.disabled = false;
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        function updateGateInputs(deviceId) {
+            const dev = devices.find(d => d.id === deviceId);
+            if (!dev || !dev.radar_config) return;
+            const gate = parseInt(document.getElementById(`gate-sel-${deviceId}`).value, 10);
+            if (!isNaN(gate) && gate >= 0 && gate < 16) {
+                document.getElementById(`move-th-${deviceId}`).value = dev.radar_config.move_thresh[gate];
+                document.getElementById(`still-th-${deviceId}`).value = dev.radar_config.still_thresh[gate];
+            }
+        }
+
+        async function toggleEspnow() {
+            const newState = isEspnowEnabled ? 0 : 1;
+            const toggleEl = document.getElementById('toggle-espnow');
+            
+            // Optimistic UI
+            isEspnowEnabled = newState === 1;
+            if (isEspnowEnabled) toggleEl.classList.add('on');
+            else toggleEl.classList.remove('on');
+
+            try {
+                // Master device, switch_id 0xFD, newState
+                const payload = new Uint8Array([0, 0xFD, newState]);
+                await queueGattWrite(payload);
+                debugLog(`CMD: Toggle ESPNOW -> ${newState}`);
+                alert("ESP-NOW setting saved. The gateway will now reboot to apply changes.");
+                setTimeout(() => window.location.reload(), 3000); // Reload page as BLE will drop
+            } catch (e) {
+                debugLog('ESPNOW CMD failed: ' + e.message);
+                // Revert
+                isEspnowEnabled = !isEspnowEnabled;
+                toggleEl.classList.toggle('on');
+                alert('Failed to toggle ESP-NOW');
+            }
+        }
+
+        async function toggleAutomation() {
+            const newState = isAutomationEnabled ? 0 : 1;
+            const toggleEl = document.getElementById('toggle-automation');
+            
+            isAutomationEnabled = newState === 1;
+            if (isAutomationEnabled) toggleEl.classList.add('on');
+            else toggleEl.classList.remove('on');
+
+            try {
+                const payload = new Uint8Array([0, 0xF5, newState]);
+                await queueGattWrite(payload);
+                debugLog(`CMD: Toggle Auto -> ${newState}`);
+            } catch (e) {
+                debugLog('Auto CMD failed: ' + e.message);
+                isAutomationEnabled = !isAutomationEnabled;
+                toggleEl.classList.toggle('on');
+                alert('Failed to toggle Automation');
+            }
+        }
+
+        async function setRadarTarget(radarDevId) {
+            // Collect checkbox states into 8-byte mask array
+            const masks = new Uint8Array(8);
+            devices.forEach(d => {
+                let mask = 0;
+                for (let s = 0; s < d.numSwitches; s++) {
+                    const cb = document.getElementById(`auto-cb-${radarDevId}-${d.id}-${s}`);
+                    if (cb && cb.checked) {
+                        mask |= (1 << s);
+                    }
+                }
+                masks[d.id] = mask;
+            });
+            
+            try {
+                const payload = new Uint8Array(10);
+                payload[0] = radarDevId;
+                payload[1] = 0xF6;
+                payload.set(masks, 2);
+                await queueGattWrite(payload);
+                debugLog(`CMD: Auto masks dev=${radarDevId} -> [${masks.join(',')}]`);
+                const btn = document.getElementById(`btn-auto-${radarDevId}`);
+                if (btn) {
+                    const old = btn.innerText;
+                    btn.innerText = '✓ Applied';
+                    setTimeout(() => btn.innerText = old, 1500);
+                }
+            } catch (e) {
+                alert('Failed to save targets: ' + e.message);
+            }
+        }
+
+        // ============================================================
+        // Render UI
+        // ============================================================
+        function renderDevices() {
+            deviceList.innerHTML = '';
+            
+            let allSwitchesOptions = ``;
+            // No longer needed for dropdown
+            
+            // Add ESP-NOW Toggle at the top
+            const espnowCard = document.createElement('div');
+            espnowCard.className = 'device-card';
+            espnowCard.innerHTML = `
+                <div class="device-header">
+                    <span class="device-name">Mesh Intercom (ESP-NOW)</span>
+                </div>
+                <div class="switch-row">
+                    <span class="switch-label">Enable ESP-NOW Radio</span>
+                    <div class="toggle-btn ${isEspnowEnabled ? 'on' : ''}" id="toggle-espnow"
+                         onclick="toggleEspnow()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+                <div style="font-size: 11px; color: #888; margin-top: 10px;">Turn off if you have no slaves and want to eliminate WiFi interference.</div>
+                
+                <div class="switch-row" style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 16px;">
+                    <span class="switch-label">Enable Radar Automation</span>
+                    <div class="toggle-btn ${isAutomationEnabled ? 'on' : ''}" id="toggle-automation"
+                         onclick="toggleAutomation()">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+            `;
+            deviceList.appendChild(espnowCard);
+
+            if (devices.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.innerHTML = 'No devices found.<br>Check your gateway.';
+                deviceList.appendChild(empty);
+                return;
+            }
+
+            devices.forEach((dev, idx) => {
+                const card = document.createElement('div');
+                card.className = 'device-card';
+                card.style.animationDelay = (idx * 0.08) + 's';
+
+                const badge = dev.id === 0
+                    ? '<span class="device-badge">MASTER</span>'
+                    : `<span class="device-badge">SLAVE</span>`;
+
+                let barsHtml = '';
+
+                let switchesHTML = '';
+                
+                // Add Presence as a disabled toggle
+                const presenceIsOn = dev.presence ? 'on' : '';
+                switchesHTML += `
+                    <div class="switch-row">
+                        <span class="switch-label">Presence</span>
+                        <div class="toggle-btn ${presenceIsOn}" id="toggle-presence-${dev.id}"
+                             style="cursor: default; opacity: 0.8;"
+                             onclick="return false;">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>`;
+
+                // Add Distance as a disabled number box
+                const distanceVal = dev.presence ? dev.distance : '';
+                switchesHTML += `
+                    <div class="switch-row">
+                        <span class="switch-label">Distance (cm)</span>
+                        <input type="number" id="input-distance-${dev.id}" class="setting-input" 
+                               style="width: 80px; text-align: right; opacity: 0.8;" 
+                               value="${distanceVal}" disabled>
+                    </div>`;
+
+                for (let s = 0; s < dev.numSwitches; s++) {
+                    const isOn = dev.states[s] ? 'on' : '';
+                    switchesHTML += `
+                        <div class="switch-row">
+                            <span class="switch-label">Switch ${s + 1}</span>
+                            <div class="toggle-btn ${isOn}" id="toggle-${dev.id}-${s}"
+                                 onclick="sendToggle(${dev.id}, ${s})">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>`;
+                }
+
+                let settingsHTML = '';
+                if (dev.offsets && dev.offsets.length > 0) {
+                    settingsHTML = `
+                        <div class="settings-panel">
+                            <div class="settings-header" onclick="document.getElementById('settings-${dev.id}').classList.toggle('expanded')">
+                                <span>⚙ Threshold Settings</span>
+                                <span>▼</span>
+                            </div>
+                            <div class="settings-content" id="settings-${dev.id}">
+                    `;
+                    for (let s = 0; s < dev.numSwitches; s++) {
+                        const savedOffset = dev.offsets[s] || 40;
+                        settingsHTML += `
+                            <div class="setting-row">
+                                <span class="setting-label">S${s + 1} Sensitivity offset:</span>
+                                <div class="setting-input-group">
+                                    <input type="number" id="offset-${dev.id}-${s}" class="setting-input" value="${savedOffset}" min="10" max="250" step="1">
+                                    <button class="setting-btn" onclick="setThreshold(${dev.id}, ${s})">Commit</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    settingsHTML += `
+                        <div style="margin-top:16px; border-top:1px solid rgba(255,255,255,0.03); padding-top:12px;">
+                            <div class="settings-header" onclick="document.getElementById('radar-settings-${dev.id}').classList.toggle('expanded')">
+                                <span>📡 Radar Configuration</span>
+                                <span>▼</span>
+                            </div>
+                            <div class="settings-content" id="radar-settings-${dev.id}">
+                                
+                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px;">
+                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Basic Settings</div>
+                                    <div class="setting-row">
+                                        <span class="setting-label">Timeout (sec):</span>
+                                        <input type="number" id="timeout-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.timeout : 120}" min="0" max="65535">
+                                    </div>
+                                    <div class="setting-row" style="margin-top:8px;">
+                                        <span class="setting-label">Min Gate (0-15):</span>
+                                        <input type="number" id="min-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.min_gate : 1}" min="0" max="15">
+                                    </div>
+                                    <div class="setting-row" style="margin-top:8px;">
+                                        <span class="setting-label">Max Gate (0-15):</span>
+                                        <input type="number" id="max-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.max_gate : 12}" min="0" max="15">
+                                    </div>
+                                    <button id="btn-radar-basic-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="sendRadarBasic(${dev.id})">Apply Basic Config</button>
+                                </div>
+
+                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px;">
+                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Gate Sensitivity</div>
+                                    <div class="setting-row">
+                                        <span class="setting-label">Gate Select:</span>
+                                        <select id="gate-sel-${dev.id}" class="setting-input" style="width:100px;" onchange="updateGateInputs(${dev.id})">
+                                            ${Array.from({length:16}, (_, i) => `<option value="${i}">Gate ${i}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="setting-row" style="margin-top:8px;">
+                                        <span class="setting-label">Move Thresh:</span>
+                                        <input type="number" id="move-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.move_thresh[0] : 250}" min="0">
+                                    </div>
+                                    <div class="setting-row" style="margin-top:8px;">
+                                        <span class="setting-label">Still Thresh:</span>
+                                        <input type="number" id="still-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.still_thresh[0] : 200}" min="0">
+                                    </div>
+                                    <button id="btn-radar-thresh-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="sendRadarThresh(${dev.id})">Apply Thresholds</button>
+                                </div>
+
+                                <div style="display:flex; gap:8px; margin-top:4px;">
+                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFC)">Auto Calibrate</button>
+                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFA)">Restart</button>
+                                    <button class="action-btn danger" onclick="sendRadarCommand(${dev.id}, 0xFB)">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    let autoCheckboxes = '';
+                    devices.forEach(targetDev => {
+                        autoCheckboxes += `<div style="margin-bottom:8px;"><div style="font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">${targetDev.name}</div>`;
+                        for (let s = 0; s < targetDev.numSwitches; s++) {
+                            const isChecked = (dev.radar_config && dev.radar_config.auto_masks && (dev.radar_config.auto_masks[targetDev.id] & (1 << s))) ? 'checked' : '';
+                            autoCheckboxes += `
+                                <label style="display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;">
+                                    <input type="checkbox" id="auto-cb-${dev.id}-${targetDev.id}-${s}" ${isChecked}
+                                           style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
+                                    <span style="font-size:13px; color:rgba(255,255,255,0.7);">Switch ${s+1}</span>
+                                </label>`;
+                        }
+                        autoCheckboxes += `</div>`;
+                    });
+
+                    settingsHTML += `
+                        <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; margin-top:16px;">
+                            <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Radar Automation Targets</div>
+                            <div style="font-size:11px; color:#888; margin-bottom:10px;">Select which switches to toggle when this device detects presence:</div>
+                            ${autoCheckboxes}
+                            <button id="btn-auto-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="setRadarTarget(${dev.id})">Save Targets</button>
+                        </div>
+                    </div></div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="device-header">
+                        <div><span class="device-name">${dev.name}</span></div>
+                        ${badge}
+                    </div>
+                    ${barsHtml}
+                    ${switchesHTML}
+                    ${settingsHTML}`;
+
+                deviceList.appendChild(card);
+            });
+        }
+
+        // ============================================================
+        // Copy Logs
+        // ============================================================
+        function copyLogs() {
+            const textToCopy = debugBox.innerText || debugBox.textContent;
+            if (!textToCopy) {
+                alert("Logs are empty!");
+                return;
+            }
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const btn = document.querySelector('.copy-log');
+                const origText = btn.innerText;
+                btn.innerText = "✓ Copied!";
+                setTimeout(() => btn.innerText = origText, 2000);
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+
+        // ============================================================
+        // Nuclear Reset (PWA cache purge)
+        // ============================================================
+        async function nuclearReset() {
+            if (!confirm('Clear all app cache and force reload?')) return;
+            statusEl.textContent = '☢ PURGING...';
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const r of regs) await r.unregister();
+                }
+                const names = await caches.keys();
+                for (const n of names) await caches.delete(n);
+                statusEl.textContent = 'RELOADING...';
+                setTimeout(() => window.location.reload(true), 500);
+            } catch (e) { alert('Reset failed: ' + e.message); }
+        }
+
+        // ============================================================
+        // Service Worker
+        // ============================================================
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
+                .then(reg => {
+                    reg.onupdatefound = () => {
+                        const w = reg.installing;
+                        w.onstatechange = () => {
+                            if (w.state === 'installed' && navigator.serviceWorker.controller) {
+                                if (confirm('New version available! Reload?')) window.location.reload();
+                            }
+                        };
+                    };
+                });
+        }
+
+        console.log(`Gateway Mesh ${APP_VERSION} | ${isStandalonePWA() ? 'PWA' : 'Browser'}`);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "Argent BLE Mesh",
+  "short_name": "Argent",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192'><rect width='192' height='192' rx='40' fill='%230a0a0c'/><path d='M96 40 L136 150 L116 150 L106 120 L86 120 L76 150 L56 150 Z M96 65 L89 105 L103 105 Z' fill='%2300d2ff'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='512' height='512' rx='110' fill='%230a0a0c'/><path d='M256 100 L366 400 L316 400 L286 310 L226 310 L196 400 L146 400 Z M256 170 L236 270 L276 270 Z' fill='%2300d2ff'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
