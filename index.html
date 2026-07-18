@@ -659,6 +659,7 @@
             try {
                 const payload = new Uint8Array([deviceId, cmdId, 0, 0]);
                 await queueGattWrite(payload);
+                await new Promise(r => setTimeout(r, 1500));
                 await refreshRoster();
                 debugLog(`CMD: Radar dev=${deviceId} action=${cmdId.toString(16)}`);
                 alert('Radar command successfully applied!');
@@ -688,6 +689,7 @@
                 payload[6] = timeout & 0xFF; payload[7] = (timeout >> 8) & 0xFF;
                 
                 await queueGattWrite(payload);
+                await new Promise(r => setTimeout(r, 1500));
                 await refreshRoster();
                 debugLog(`CMD: Radar Basic dev=${deviceId} min=${minGate} max=${maxGate} time=${timeout}`);
                 if (btn) {
@@ -721,6 +723,7 @@
                 payload[7] = still & 0xFF; payload[8] = (still >> 8) & 0xFF; payload[9] = (still >> 16) & 0xFF; payload[10] = (still >> 24) & 0xFF;
                 
                 await queueGattWrite(payload);
+                await new Promise(r => setTimeout(r, 1500));
                 await refreshRoster();
                 debugLog(`CMD: Radar Thresh dev=${deviceId} gate=${gate} move=${move} still=${still}`);
                 if (btn) {
