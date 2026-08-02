@@ -669,16 +669,46 @@
             }
         }
         
-        async function sendRadarBasic(deviceId) {
-            const minGate = parseInt(document.getElementById(`min-gate-${deviceId}`).value, 10);
-            const maxGate = parseInt(document.getElementById(`max-gate-${deviceId}`).value, 10);
+        // ── Individual radar basic config commit functions ──
+        // Each reads the single changed field from the input, fills the other
+        // two from the device's last-known radar_config, and sends the full
+        // 0xF8 command (the LD2420 requires all 3 values in one write).
+        
+        async function commitRadarTimeout(deviceId) {
             const timeout = parseInt(document.getElementById(`timeout-${deviceId}`).value, 10);
-            const btn = document.getElementById(`btn-radar-basic-${deviceId}`);
-            
-            if (isNaN(minGate) || isNaN(maxGate) || isNaN(timeout)) {
-                alert("Please enter valid numbers"); return;
+            if (isNaN(timeout) || timeout < 0 || timeout > 65535) {
+                alert('Timeout must be 0–65535'); return;
             }
-            
+            const dev = devices.find(d => d.id === deviceId);
+            const minGate = dev?.radar_config?.min_gate ?? 1;
+            const maxGate = dev?.radar_config?.max_gate ?? 12;
+            await sendRadarBasicValues(deviceId, minGate, maxGate, timeout, `btn-timeout-${deviceId}`);
+        }
+        
+        async function commitRadarMinGate(deviceId) {
+            const minGate = parseInt(document.getElementById(`min-gate-${deviceId}`).value, 10);
+            if (isNaN(minGate) || minGate < 0 || minGate > 15) {
+                alert('Min Gate must be 0–15'); return;
+            }
+            const dev = devices.find(d => d.id === deviceId);
+            const maxGate = dev?.radar_config?.max_gate ?? 12;
+            const timeout = dev?.radar_config?.timeout ?? 120;
+            await sendRadarBasicValues(deviceId, minGate, maxGate, timeout, `btn-min-gate-${deviceId}`);
+        }
+        
+        async function commitRadarMaxGate(deviceId) {
+            const maxGate = parseInt(document.getElementById(`max-gate-${deviceId}`).value, 10);
+            if (isNaN(maxGate) || maxGate < 0 || maxGate > 15) {
+                alert('Max Gate must be 0–15'); return;
+            }
+            const dev = devices.find(d => d.id === deviceId);
+            const minGate = dev?.radar_config?.min_gate ?? 1;
+            const timeout = dev?.radar_config?.timeout ?? 120;
+            await sendRadarBasicValues(deviceId, minGate, maxGate, timeout, `btn-max-gate-${deviceId}`);
+        }
+        
+        async function sendRadarBasicValues(deviceId, minGate, maxGate, timeout, btnId) {
+            const btn = document.getElementById(btnId);
             try {
                 if (btn) btn.disabled = true;
                 const payload = new Uint8Array(8);
@@ -693,9 +723,8 @@
                 await refreshRoster();
                 debugLog(`CMD: Radar Basic dev=${deviceId} min=${minGate} max=${maxGate} time=${timeout}`);
                 if (btn) {
-                    const old = btn.innerText; 
-                    btn.innerText = "✓ Applied & Verified"; 
-                    setTimeout(() => { btn.innerText = old; btn.disabled = false; }, 1500);
+                    btn.innerText = '✓';
+                    setTimeout(() => { btn.innerText = 'Commit'; btn.disabled = false; }, 1000);
                 }
             } catch (e) {
                 if (btn) btn.disabled = false;
@@ -949,17 +978,25 @@
                                     <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Basic Settings</div>
                                     <div class="setting-row">
                                         <span class="setting-label">Timeout (sec):</span>
-                                        <input type="number" id="timeout-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.timeout : 120}" min="0" max="65535">
+                                        <div class="setting-input-group">
+                                            <input type="number" id="timeout-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.timeout : 120}" min="0" max="65535">
+                                            <button class="setting-btn" id="btn-timeout-${dev.id}" onclick="commitRadarTimeout(${dev.id})">Commit</button>
+                                        </div>
                                     </div>
                                     <div class="setting-row" style="margin-top:8px;">
                                         <span class="setting-label">Min Gate (0-15):</span>
-                                        <input type="number" id="min-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.min_gate : 1}" min="0" max="15">
+                                        <div class="setting-input-group">
+                                            <input type="number" id="min-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.min_gate : 1}" min="0" max="15">
+                                            <button class="setting-btn" id="btn-min-gate-${dev.id}" onclick="commitRadarMinGate(${dev.id})">Commit</button>
+                                        </div>
                                     </div>
                                     <div class="setting-row" style="margin-top:8px;">
                                         <span class="setting-label">Max Gate (0-15):</span>
-                                        <input type="number" id="max-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.max_gate : 12}" min="0" max="15">
+                                        <div class="setting-input-group">
+                                            <input type="number" id="max-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.max_gate : 12}" min="0" max="15">
+                                            <button class="setting-btn" id="btn-max-gate-${dev.id}" onclick="commitRadarMaxGate(${dev.id})">Commit</button>
+                                        </div>
                                     </div>
-                                    <button id="btn-radar-basic-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="sendRadarBasic(${dev.id})">Apply Basic Config</button>
                                 </div>
 
                                 <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px;">
