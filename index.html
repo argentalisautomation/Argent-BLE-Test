@@ -1244,32 +1244,36 @@
         }
 
         // ============================================================
-        // OTA Firmware Flash
+        // OTA Firmware Flash (Device Specific)
         // ============================================================
-        let otaFile = null;
         const OTA_CHUNK_SIZE = 507; // 1 op byte + 507 data = 508 bytes, well within 512 MTU
 
-        document.getElementById('otaFileInput').addEventListener('change', (e) => {
-            otaFile = e.target.files[0] || null;
-            const label = document.getElementById('otaFileLabel');
-            const btn   = document.getElementById('otaFlashBtn');
-            if (otaFile) {
-                const kb = (otaFile.size / 1024).toFixed(0);
-                label.textContent = `✅ ${otaFile.name} (${kb} KB)`;
+        function handleOtaFileSelect(event, devId) {
+            const file = event.target.files[0];
+            const label = document.getElementById(`otaFileLabel-${devId}`);
+            const btn   = document.getElementById(`otaFlashBtn-${devId}`);
+            const status = document.getElementById(`otaStatus-${devId}`);
+            
+            if (file) {
+                const kb = (file.size / 1024).toFixed(0);
+                label.textContent = `✅ ${file.name} (${kb} KB)`;
                 label.classList.add('file-ready');
                 btn.disabled = false;
-                document.getElementById('otaStatus').textContent = 'Ready to flash.';
+                status.textContent = 'Ready to flash.';
             } else {
                 label.textContent = '📁 Tap to select firmware.bin';
                 label.classList.remove('file-ready');
                 btn.disabled = true;
-                document.getElementById('otaStatus').textContent = '';
+                status.textContent = '';
             }
-        });
+        }
 
-        async function flashFirmware() {
+        async function flashFirmware(devId) {
+            const fileInput = document.getElementById(`otaFileInput-${devId}`);
+            const otaFile = fileInput.files[0];
+
             if (!otaFile || !otaChar) {
-                alert('No file selected or OTA not available.');
+                alert('No file selected or OTA not available (v0.2 firmware?).');
                 return;
             }
 
@@ -1279,10 +1283,10 @@
             );
             if (!confirmed) return;
 
-            const btn        = document.getElementById('otaFlashBtn');
-            const progressWrap = document.getElementById('otaProgressWrap');
-            const progressBar  = document.getElementById('otaProgressBar');
-            const otaStatus    = document.getElementById('otaStatus');
+            const btn        = document.getElementById(`otaFlashBtn-${devId}`);
+            const progressWrap = document.getElementById(`otaProgressWrap-${devId}`);
+            const progressBar  = document.getElementById(`otaProgressBar-${devId}`);
+            const otaStatus    = document.getElementById(`otaStatus-${devId}`);
 
             btn.disabled = true;
             progressWrap.style.display = 'block';
@@ -1339,13 +1343,12 @@
                 // Reset UI after reboot window
                 setTimeout(() => {
                     btn.disabled = false;
-                    otaFile = null;
-                    document.getElementById('otaFileLabel').textContent = '📁 Tap to select firmware.bin';
-                    document.getElementById('otaFileLabel').classList.remove('file-ready');
+                    fileInput.value = '';
+                    document.getElementById(`otaFileLabel-${devId}`).textContent = '📁 Tap to select firmware.bin';
+                    document.getElementById(`otaFileLabel-${devId}`).classList.remove('file-ready');
                     progressWrap.style.display = 'none';
                     progressBar.style.width    = '0%';
                     otaStatus.textContent      = 'Reconnect to continue.';
-                    document.getElementById('otaFileInput').value = '';
                 }, 6000);
 
             } catch (e) {
