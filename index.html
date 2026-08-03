@@ -297,12 +297,90 @@
             cursor: pointer;
         }
         .setting-btn:active { background: rgba(255,255,255,0.2); }
+
+        /* --- OTA Panel --- */
+        .ota-panel {
+            width: 100%;
+            max-width: 380px;
+            background: rgba(255,200,0,0.05);
+            border: 1px solid rgba(255,200,0,0.2);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-top: 12px;
+            display: none;
+        }
+        .ota-panel h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffd60a;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .ota-panel p {
+            font-size: 12px;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+        .ota-file-label {
+            display: block;
+            background: rgba(255,255,255,0.07);
+            border: 1px dashed rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255,255,255,0.55);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        .ota-file-label:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .ota-file-label.file-ready { border-color: #ffd60a; color: #ffd60a; }
+        #otaFileInput { display: none; }
+        .ota-progress-wrap {
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .ota-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffd60a, #ff9f0a);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        #otaStatus {
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 12px;
+            min-height: 18px;
+        }
+        .ota-flash-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: opacity 0.2s;
+        }
+        .ota-flash-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ota-flash-btn:active:not(:disabled) { opacity: 0.8; }
     </style>
 </head>
 
 <body>
     <h1>Gateway Mesh</h1>
-    <div class="subtitle">v0.2 &middot; ESP-NOW + BLE</div>
+    <div class="subtitle">v0.3 &middot; ESP-NOW + BLE + OTA</div>
 
     <button id="connectBtn" class="main-btn">Connect Gateway</button>
     <div id="status">Ready</div>
@@ -317,15 +395,29 @@
 
     <div id="debugBox" class="debug-box" style="display:none;"></div>
 
+    <!-- OTA Panel (shown only when F5 characteristic is found) -->
+    <div class="ota-panel" id="otaPanel">
+        <h3>⚡ Firmware Update</h3>
+        <p>Select a <code>.bin</code> file built from <code>idf.py build</code>.<br>The device will reboot automatically after flashing.</p>
+        <label class="ota-file-label" for="otaFileInput" id="otaFileLabel">📁 Tap to select firmware.bin</label>
+        <input type="file" id="otaFileInput" accept=".bin">
+        <div class="ota-progress-wrap" id="otaProgressWrap">
+            <div class="ota-progress-bar" id="otaProgressBar"></div>
+        </div>
+        <div id="otaStatus"></div>
+        <button class="ota-flash-btn" id="otaFlashBtn" onclick="flashFirmware()" disabled>Flash Firmware</button>
+    </div>
+
     <script>
-        const APP_VERSION = 'v0.2';
+        const APP_VERSION = 'v0.3';
         const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
         const ROSTER_UUID  = '12345678-1234-5678-1234-56789abcdef1';
         const COMMAND_UUID = '12345678-1234-5678-1234-56789abcdef2';
         const STATE_UUID   = '12345678-1234-5678-1234-56789abcdef3';
+        const OTA_UUID     = '12345678-1234-5678-1234-56789abcdef5';
 
         let bleDevice, gattServer;
-        let rosterChar, commandChar, stateChar;
+        let rosterChar, commandChar, stateChar, otaChar;
         let devices = []; // [{id, name, numSwitches, states:[]}]
         let pollTimer = null;
         let isGattWritePending = false;
@@ -393,6 +485,15 @@
                 rosterChar  = await service.getCharacteristic(ROSTER_UUID);
                 commandChar = await service.getCharacteristic(COMMAND_UUID);
                 stateChar   = await service.getCharacteristic(STATE_UUID);
+                try {
+                    otaChar = await service.getCharacteristic(OTA_UUID);
+                    debugLog('OTA characteristic discovered');
+                    document.getElementById('otaPanel').style.display = 'block';
+                } catch (e) {
+                    otaChar = null;
+                    debugLog('OTA char not found (v0.2 firmware?): ' + e.message);
+                    document.getElementById('otaPanel').style.display = 'none';
+                }
                 debugLog('Characteristics discovered');
 
                 // Subscribe to state notifications
@@ -425,8 +526,10 @@
             statusEl.textContent = 'DISCONNECTED';
             connectBtn.style.display = 'block';
             actionBar.style.display = 'none';
+            document.getElementById('otaPanel').style.display = 'none';
             deviceList.innerHTML = '';
             devices = [];
+            otaChar = null;
             stopStatePolling();
             debugLog('Disconnected');
         }
@@ -1103,8 +1206,123 @@
         }
 
         // ============================================================
-        // Service Worker
+        // OTA Firmware Flash
         // ============================================================
+        let otaFile = null;
+        const OTA_CHUNK_SIZE = 507; // 1 op byte + 507 data = 508 bytes, well within 512 MTU
+
+        document.getElementById('otaFileInput').addEventListener('change', (e) => {
+            otaFile = e.target.files[0] || null;
+            const label = document.getElementById('otaFileLabel');
+            const btn   = document.getElementById('otaFlashBtn');
+            if (otaFile) {
+                const kb = (otaFile.size / 1024).toFixed(0);
+                label.textContent = `✅ ${otaFile.name} (${kb} KB)`;
+                label.classList.add('file-ready');
+                btn.disabled = false;
+                document.getElementById('otaStatus').textContent = 'Ready to flash.';
+            } else {
+                label.textContent = '📁 Tap to select firmware.bin';
+                label.classList.remove('file-ready');
+                btn.disabled = true;
+                document.getElementById('otaStatus').textContent = '';
+            }
+        });
+
+        async function flashFirmware() {
+            if (!otaFile || !otaChar) {
+                alert('No file selected or OTA not available.');
+                return;
+            }
+
+            const confirmed = confirm(
+                `⚡ Flash "${otaFile.name}" (${(otaFile.size/1024).toFixed(0)} KB)?\n\n` +
+                `The device will reboot after transfer. Do NOT close this page until done.`
+            );
+            if (!confirmed) return;
+
+            const btn        = document.getElementById('otaFlashBtn');
+            const progressWrap = document.getElementById('otaProgressWrap');
+            const progressBar  = document.getElementById('otaProgressBar');
+            const otaStatus    = document.getElementById('otaStatus');
+
+            btn.disabled = true;
+            progressWrap.style.display = 'block';
+            progressBar.style.width    = '0%';
+
+            try {
+                const buffer    = await otaFile.arrayBuffer();
+                const data      = new Uint8Array(buffer);
+                const totalSize = data.byteLength;
+
+                // ── BEGIN ──────────────────────────────────────────
+                const beginPkt = new Uint8Array(5);
+                beginPkt[0] = 0x00;
+                beginPkt[1] =  totalSize        & 0xFF;
+                beginPkt[2] = (totalSize >>  8)  & 0xFF;
+                beginPkt[3] = (totalSize >> 16) & 0xFF;
+                beginPkt[4] = (totalSize >> 24) & 0xFF;
+                await otaChar.writeValueWithResponse(beginPkt);
+                otaStatus.textContent = `Starting… ${(totalSize/1024).toFixed(0)} KB total`;
+                debugLog(`OTA BEGIN: ${totalSize} bytes`);
+
+                // Short pause — give ESP time to open OTA partition
+                await new Promise(r => setTimeout(r, 300));
+
+                // ── DATA CHUNKS ────────────────────────────────────
+                let sent = 0;
+                while (sent < totalSize) {
+                    const chunkLen  = Math.min(OTA_CHUNK_SIZE, totalSize - sent);
+                    const pkt       = new Uint8Array(1 + chunkLen);
+                    pkt[0]          = 0x01;
+                    pkt.set(data.subarray(sent, sent + chunkLen), 1);
+                    await otaChar.writeValueWithoutResponse(pkt);
+                    sent += chunkLen;
+
+                    const pct = Math.round((sent / totalSize) * 100);
+                    progressBar.style.width = pct + '%';
+                    otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
+
+                    // Yield every ~16 KB to keep the UI responsive
+                    if (sent % (16 * 1024) < chunkLen) {
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                }
+
+                // ── COMMIT ─────────────────────────────────────────
+                otaStatus.textContent = 'Verifying & committing…';
+                const commitPkt = new Uint8Array([0x02]);
+                await otaChar.writeValueWithResponse(commitPkt);
+
+                progressBar.style.width = '100%';
+                otaStatus.textContent   = '✅ Done! Device is rebooting… reconnect in ~5s.';
+                debugLog('OTA complete');
+
+                // Reset UI after reboot window
+                setTimeout(() => {
+                    btn.disabled = false;
+                    otaFile = null;
+                    document.getElementById('otaFileLabel').textContent = '📁 Tap to select firmware.bin';
+                    document.getElementById('otaFileLabel').classList.remove('file-ready');
+                    progressWrap.style.display = 'none';
+                    progressBar.style.width    = '0%';
+                    otaStatus.textContent      = 'Reconnect to continue.';
+                    document.getElementById('otaFileInput').value = '';
+                }, 6000);
+
+            } catch (e) {
+                // Attempt abort
+                try {
+                    if (otaChar) await otaChar.writeValueWithResponse(new Uint8Array([0xFF]));
+                } catch (_) {}
+                otaStatus.textContent = '❌ Failed: ' + e.message;
+                progressWrap.style.display = 'none';
+                btn.disabled = false;
+                debugLog('OTA error: ' + e.message);
+            }
+        }
+
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
                 .then(reg => {
