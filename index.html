@@ -395,20 +395,19 @@
 
     <div id="debugBox" class="debug-box" style="display:none;"></div>
 
-    <!-- OTA Panel (shown only when F5 characteristic is found) -->
-    <div class="ota-panel" id="otaPanel">
-        <h3>⚡ Firmware Update</h3>
-        <p>Select a <code>.bin</code> file built from <code>idf.py build</code>.<br>The device will reboot automatically after flashing.</p>
-        <label class="ota-file-label" for="otaFileInput" id="otaFileLabel">📁 Tap to select firmware.bin</label>
-        <input type="file" id="otaFileInput" accept=".bin">
-        <div class="ota-progress-wrap" id="otaProgressWrap">
-            <div class="ota-progress-bar" id="otaProgressBar"></div>
+
         </div>
         <div id="otaStatus"></div>
         <button class="ota-flash-btn" id="otaFlashBtn" onclick="flashFirmware()" disabled>Flash Firmware</button>
     </div>
 
     <script>
+        
+        function toggleAcc(btn) {
+            const accordion = btn.parentElement;
+            accordion.classList.toggle('active');
+        }
+
         const APP_VERSION = 'v0.3';
         const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
         const ROSTER_UUID  = '12345678-1234-5678-1234-56789abcdef1';
@@ -1048,17 +1047,11 @@
 
                 let settingsHTML = '';
                 if (dev.offsets && dev.offsets.length > 0) {
-                    settingsHTML = `
-                        <div class="settings-panel">
-                            <div class="settings-header" onclick="document.getElementById('settings-${dev.id}').classList.toggle('expanded')">
-                                <span>⚙ Threshold Settings</span>
-                                <span>▼</span>
-                            </div>
-                            <div class="settings-content" id="settings-${dev.id}">
-                    `;
+                    
+                    let thresholdHtml = '';
                     for (let s = 0; s < dev.numSwitches; s++) {
                         const savedOffset = dev.offsets[s] || 40;
-                        settingsHTML += `
+                        thresholdHtml += `
                             <div class="setting-row">
                                 <span class="setting-label">S${s + 1} Sensitivity offset:</span>
                                 <div class="setting-input-group">
@@ -1069,67 +1062,6 @@
                         `;
                     }
                     
-                    settingsHTML += `
-                        <div style="margin-top:16px; border-top:1px solid rgba(255,255,255,0.03); padding-top:12px;">
-                            <div class="settings-header" onclick="document.getElementById('radar-settings-${dev.id}').classList.toggle('expanded')">
-                                <span>📡 Radar Configuration</span>
-                                <span>▼</span>
-                            </div>
-                            <div class="settings-content" id="radar-settings-${dev.id}">
-                                
-                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px;">
-                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Basic Settings</div>
-                                    <div class="setting-row">
-                                        <span class="setting-label">Timeout (sec):</span>
-                                        <div class="setting-input-group">
-                                            <input type="number" id="timeout-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.timeout : 120}" min="0" max="65535">
-                                            <button class="setting-btn" id="btn-timeout-${dev.id}" onclick="commitRadarTimeout(${dev.id})">Commit</button>
-                                        </div>
-                                    </div>
-                                    <div class="setting-row" style="margin-top:8px;">
-                                        <span class="setting-label">Min Gate (0-15):</span>
-                                        <div class="setting-input-group">
-                                            <input type="number" id="min-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.min_gate : 1}" min="0" max="15">
-                                            <button class="setting-btn" id="btn-min-gate-${dev.id}" onclick="commitRadarMinGate(${dev.id})">Commit</button>
-                                        </div>
-                                    </div>
-                                    <div class="setting-row" style="margin-top:8px;">
-                                        <span class="setting-label">Max Gate (0-15):</span>
-                                        <div class="setting-input-group">
-                                            <input type="number" id="max-gate-${dev.id}" class="setting-input" value="${dev.radar_config ? dev.radar_config.max_gate : 12}" min="0" max="15">
-                                            <button class="setting-btn" id="btn-max-gate-${dev.id}" onclick="commitRadarMaxGate(${dev.id})">Commit</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px;">
-                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Gate Sensitivity</div>
-                                    <div class="setting-row">
-                                        <span class="setting-label">Gate Select:</span>
-                                        <select id="gate-sel-${dev.id}" class="setting-input" style="width:100px;" onchange="updateGateInputs(${dev.id})">
-                                            ${Array.from({length:16}, (_, i) => `<option value="${i}">Gate ${i}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div class="setting-row" style="margin-top:8px;">
-                                        <span class="setting-label">Move Thresh:</span>
-                                        <input type="number" id="move-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.move_thresh[0] : 250}" min="0">
-                                    </div>
-                                    <div class="setting-row" style="margin-top:8px;">
-                                        <span class="setting-label">Still Thresh:</span>
-                                        <input type="number" id="still-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.still_thresh[0] : 200}" min="0">
-                                    </div>
-                                    <button id="btn-radar-thresh-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="sendRadarThresh(${dev.id})">Apply Thresholds</button>
-                                </div>
-
-                                <div style="display:flex; gap:8px; margin-top:4px;">
-                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFC)">Auto Calibrate</button>
-                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFA)">Restart</button>
-                                    <button class="action-btn danger" onclick="sendRadarCommand(${dev.id}, 0xFB)">Reset</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-
                     let autoCheckboxes = '';
                     devices.forEach(targetDev => {
                         autoCheckboxes += `<div style="margin-bottom:8px;"><div style="font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">${targetDev.name}</div>`;
@@ -1138,22 +1070,136 @@
                             autoCheckboxes += `
                                 <label style="display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer;">
                                     <input type="checkbox" id="auto-cb-${dev.id}-${targetDev.id}-${s}" ${isChecked}
-                                           style="width:18px; height:18px; accent-color:var(--accent); cursor:pointer;">
+                                           style="width:18px; height:18px; accent-color:#00d2ff; cursor:pointer;">
                                     <span style="font-size:13px; color:rgba(255,255,255,0.7);">Switch ${s+1}</span>
                                 </label>`;
                         }
                         autoCheckboxes += `</div>`;
                     });
 
-                    settingsHTML += `
-                        <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; margin-top:16px;">
-                            <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Radar Automation Targets</div>
-                            <div style="font-size:11px; color:#888; margin-bottom:10px;">Select which switches to toggle when this device detects presence:</div>
-                            ${autoCheckboxes}
-                            <button id="btn-auto-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="setRadarTarget(${dev.id})">Save Targets</button>
-                        </div>
-                    </div></div>`;
-                }
+                    settingsHTML = `
+                        <!-- Root Settings Accordion -->
+                        <div class="accordion">
+                            <button class="accordion-btn" onclick="toggleAcc(this)">
+                                <span>⚙️ Settings</span>
+                                <span class="accordion-icon">▼</span>
+                            </button>
+                            <div class="accordion-content">
+                                <div class="accordion-body">
+                                    
+                                    <!-- Threshold Settings -->
+                                    <div class="accordion sub-accordion">
+                                        <button class="accordion-btn" onclick="toggleAcc(this)">
+                                            <span>🎯 Threshold Settings</span>
+                                            <span class="accordion-icon">▼</span>
+                                        </button>
+                                        <div class="accordion-content">
+                                            <div class="accordion-body">
+                                                ${thresholdHtml}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Radar Settings -->
+                                    <div class="accordion sub-accordion">
+                                        <button class="accordion-btn" onclick="toggleAcc(this)">
+                                            <span>📡 Radar Settings</span>
+                                            <span class="accordion-icon">▼</span>
+                                        </button>
+                                        <div class="accordion-content">
+                                            <div class="accordion-body">
+                                                
+                                                <!-- Inner: Configuration -->
+                                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; margin-bottom: 12px;">
+                                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Basic Settings</div>
+                                                    <div class="setting-row">
+                                                        <span class="setting-label">Timeout (sec):</span>
+                                                        <div class="setting-input-group">
+                                                            <input type="number" id="timeout-${dev.id}" class="setting-input" style="width:70px;" value="${dev.radar_config ? dev.radar_config.timeout : 120}" min="0" max="65535">
+                                                            <button class="setting-btn" id="btn-timeout-${dev.id}" onclick="commitRadarTimeout(${dev.id})">Commit</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="setting-row" style="margin-top:8px;">
+                                                        <span class="setting-label">Min Gate (0-15):</span>
+                                                        <div class="setting-input-group">
+                                                            <input type="number" id="min-gate-${dev.id}" class="setting-input" style="width:70px;" value="${dev.radar_config ? dev.radar_config.min_gate : 1}" min="0" max="15">
+                                                            <button class="setting-btn" id="btn-min-gate-${dev.id}" onclick="commitRadarMinGate(${dev.id})">Commit</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="setting-row" style="margin-top:8px;">
+                                                        <span class="setting-label">Max Gate (0-15):</span>
+                                                        <div class="setting-input-group">
+                                                            <input type="number" id="max-gate-${dev.id}" class="setting-input" style="width:70px;" value="${dev.radar_config ? dev.radar_config.max_gate : 12}" min="0" max="15">
+                                                            <button class="setting-btn" id="btn-max-gate-${dev.id}" onclick="commitRadarMaxGate(${dev.id})">Commit</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; margin-bottom: 12px;">
+                                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Gate Sensitivity</div>
+                                                    <div class="setting-row">
+                                                        <span class="setting-label">Gate Select:</span>
+                                                        <select id="gate-sel-${dev.id}" class="setting-input" style="width:100px;" onchange="updateGateInputs(${dev.id})">
+                                                            ${Array.from({length:16}, (_, i) => `<option value="${i}">Gate ${i}</option>`).join('')}
+                                                        </select>
+                                                    </div>
+                                                    <div class="setting-row" style="margin-top:8px;">
+                                                        <span class="setting-label">Move Thresh:</span>
+                                                        <input type="number" id="move-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.move_thresh[0] : 250}" min="0">
+                                                    </div>
+                                                    <div class="setting-row" style="margin-top:8px;">
+                                                        <span class="setting-label">Still Thresh:</span>
+                                                        <input type="number" id="still-th-${dev.id}" class="setting-input" style="width:100px;" value="${dev.radar_config ? dev.radar_config.still_thresh[0] : 200}" min="0">
+                                                    </div>
+                                                    <button id="btn-radar-thresh-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="sendRadarThresh(${dev.id})">Apply Thresholds</button>
+                                                </div>
+
+                                                <div style="display:flex; gap:8px; margin-top:4px;">
+                                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFC)">Auto Calibrate</button>
+                                                    <button class="action-btn" onclick="sendRadarCommand(${dev.id}, 0xFA)">Restart</button>
+                                                    <button class="action-btn danger" onclick="sendRadarCommand(${dev.id}, 0xFB)">Reset</button>
+                                                </div>
+
+                                                <!-- Inner: Automation Targets -->
+                                                <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; margin-top:16px;">
+                                                    <div style="font-size:12px; color:var(--accent); margin-bottom:10px;">Radar Automation Targets</div>
+                                                    <div style="font-size:11px; color:#888; margin-bottom:10px;">Select which switches to toggle when this device detects presence:</div>
+                                                    
+                                                    ${autoCheckboxes}
+                                                    
+                                                    <button id="btn-auto-${dev.id}" class="action-btn" style="width:100%; margin-top:10px;" onclick="setRadarTarget(${dev.id})">Save Targets</button>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Firmware Update -->
+                                    <div class="accordion sub-accordion">
+                                        <button class="accordion-btn" onclick="toggleAcc(this)">
+                                            <span>⚡ Firmware Update</span>
+                                            <span class="accordion-icon">▼</span>
+                                        </button>
+                                        <div class="accordion-content">
+                                            <div class="accordion-body">
+                                                <div class="ota-panel" id="otaPanel-${dev.id}" style="display:block;">
+                                                    <p>Select a <code>.bin</code> file built from <code>idf.py build</code>.<br>The device will reboot automatically after flashing.</p>
+                                                    <label class="ota-file-label" for="otaFileInput-${dev.id}" id="otaFileLabel-${dev.id}">📁 Tap to select firmware.bin</label>
+                                                    <input type="file" id="otaFileInput-${dev.id}" accept=".bin" style="display:none;" onchange="handleOtaFileSelect(event, ${dev.id})">
+                                                    <div class="ota-progress-wrap" id="otaProgressWrap-${dev.id}">
+                                                        <div class="ota-progress-bar" id="otaProgressBar-${dev.id}"></div>
+                                                    </div>
+                                                    <div id="otaStatus-${dev.id}" class="ota-status-text"></div>
+                                                    <button class="ota-flash-btn" id="otaFlashBtn-${dev.id}" onclick="flashFirmware(${dev.id})" disabled>Flash Firmware</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div> <!-- End Root Settings -->
+
 
                 card.innerHTML = `
                     <div class="device-header">
