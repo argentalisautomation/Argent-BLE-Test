@@ -396,11 +396,6 @@
     <div id="debugBox" class="debug-box" style="display:none;"></div>
 
 
-        </div>
-        <div id="otaStatus"></div>
-        <button class="ota-flash-btn" id="otaFlashBtn" onclick="flashFirmware()" disabled>Flash Firmware</button>
-    </div>
-
     <script>
         
         function toggleAcc(btn) {
@@ -487,11 +482,9 @@
                 try {
                     otaChar = await service.getCharacteristic(OTA_UUID);
                     debugLog('OTA characteristic discovered');
-                    document.getElementById('otaPanel').style.display = 'block';
                 } catch (e) {
                     otaChar = null;
                     debugLog('OTA char not found (v0.2 firmware?): ' + e.message);
-                    document.getElementById('otaPanel').style.display = 'none';
                 }
                 debugLog('Characteristics discovered');
 
@@ -525,7 +518,6 @@
             statusEl.textContent = 'DISCONNECTED';
             connectBtn.style.display = 'block';
             actionBar.style.display = 'none';
-            document.getElementById('otaPanel').style.display = 'none';
             deviceList.innerHTML = '';
             devices = [];
             otaChar = null;
