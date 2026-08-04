@@ -1356,6 +1356,20 @@
                 const data      = new Uint8Array(buffer);
                 const totalSize = data.byteLength;
 
+                // ── ASYNC CONTROL (Nordic DFU Standard) ────────────
+                // Listen for the 0x04 READY notification before sending data
+                await otaChar.startNotifications();
+                let otaReadyPromise = new Promise((resolve) => {
+                    const listener = (event) => {
+                        const val = new Uint8Array(event.target.value.buffer);
+                        if (val[0] === 0x04) { // READY
+                            otaChar.removeEventListener('characteristicvaluechanged', listener);
+                            resolve();
+                        }
+                    };
+                    otaChar.addEventListener('characteristicvaluechanged', listener);
+                });
+
                 // ── BEGIN ──────────────────────────────────────────
                 const beginPkt = new Uint8Array(5);
                 beginPkt[0] = 0x00;
@@ -1363,39 +1377,42 @@
                 beginPkt[2] = (totalSize >>  8)  & 0xFF;
                 beginPkt[3] = (totalSize >> 16) & 0xFF;
                 beginPkt[4] = (totalSize >> 24) & 0xFF;
-                await otaChar.writeValueWithoutResponse(beginPkt);
-                otaStatus.textContent = `Starting… ${(totalSize/1024).toFixed(0)} KB total`;
-                debugLog(`OTA BEGIN: ${totalSize} bytes`);
+                
+                await otaChar.writeValueWithResponse(beginPkt);
+                otaStatus.textContent = `Erasing flash… (${(totalSize/1024).toFixed(0)} KB total)`;
+                debugLog(`OTA BEGIN sent. Waiting for READY signal...`);
 
-                // Short pause — give ESP time to open OTA partition
-                await new Promise(r => setTimeout(r, 5000)); // 5 second wait for flash erase
+                // Pause and wait for ESP32 background erase to finish
+                await otaReadyPromise;
+                debugLog(`OTA READY received! Starting data transfer.`);
 
                 // ── DATA CHUNKS ────────────────────────────────────
                 let sent = 0;
+                const OTA_CHUNK_SIZE_SAFE = 240; // 240 bytes guarantees safety inside standard 256 MTU
+                
                 while (sent < totalSize) {
-                    const chunkLen  = Math.min(OTA_CHUNK_SIZE, totalSize - sent);
+                    const chunkLen  = Math.min(OTA_CHUNK_SIZE_SAFE, totalSize - sent);
                     const pkt       = new Uint8Array(1 + chunkLen);
                     pkt[0]          = 0x01;
                     pkt.set(data.subarray(sent, sent + chunkLen), 1);
                     
-                    // Use WriteWithoutResponse for MTU compatibility, but pace strictly to avoid overflowing ESP32 buffers
-                    await otaChar.writeValueWithoutResponse(pkt);
+                    // WriteWithResponse naturally throttles the loop to match flash write speed
+                    await otaChar.writeValueWithResponse(pkt);
                     
                     sent += chunkLen;
 
                     const pct = Math.round((sent / totalSize) * 100);
                     progressBar.style.width = pct + '%';
                     otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
-
-                    // Strict pacing: 30ms per 512 bytes = ~17 KB/s. Matches ESP32 flash write speed.
-                    await new Promise(r => setTimeout(r, 30));
                 }
 
                 // ── COMMIT ─────────────────────────────────────────
                 otaStatus.textContent = 'Verifying & committing…';
                 const commitPkt = new Uint8Array([0x03]); // 0x03 = COMMIT AND RELAY
-                await otaChar.writeValueWithoutResponse(commitPkt);
+                await otaChar.writeValueWithResponse(commitPkt);
 
+                await otaChar.stopNotifications();
+                
                 progressBar.style.width = '100%';
                 otaStatus.textContent   = '✅ Done! Device is rebooting… reconnect in ~5s.';
                 debugLog('OTA complete');
