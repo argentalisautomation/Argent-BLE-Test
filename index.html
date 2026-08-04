@@ -1363,7 +1363,7 @@
                 beginPkt[2] = (totalSize >>  8)  & 0xFF;
                 beginPkt[3] = (totalSize >> 16) & 0xFF;
                 beginPkt[4] = (totalSize >> 24) & 0xFF;
-                await otaChar.writeValueWithResponse(beginPkt);
+                await otaChar.writeValueWithoutResponse(beginPkt);
                 otaStatus.textContent = `Starting… ${(totalSize/1024).toFixed(0)} KB total`;
                 debugLog(`OTA BEGIN: ${totalSize} bytes`);
 
@@ -1378,20 +1378,23 @@
                     pkt[0]          = 0x01;
                     pkt.set(data.subarray(sent, sent + chunkLen), 1);
                     
-                    // WriteWithResponse provides protocol-level ACKs to prevent GATT timeouts
-                    await otaChar.writeValueWithResponse(pkt);
+                    // Use WriteWithoutResponse for MTU compatibility, but pace strictly to avoid overflowing ESP32 buffers
+                    await otaChar.writeValueWithoutResponse(pkt);
                     
                     sent += chunkLen;
 
                     const pct = Math.round((sent / totalSize) * 100);
                     progressBar.style.width = pct + '%';
                     otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
+
+                    // Strict pacing: 30ms per 512 bytes = ~17 KB/s. Matches ESP32 flash write speed.
+                    await new Promise(r => setTimeout(r, 30));
                 }
 
                 // ── COMMIT ─────────────────────────────────────────
                 otaStatus.textContent = 'Verifying & committing…';
                 const commitPkt = new Uint8Array([0x03]); // 0x03 = COMMIT AND RELAY
-                await otaChar.writeValueWithResponse(commitPkt);
+                await otaChar.writeValueWithoutResponse(commitPkt);
 
                 progressBar.style.width = '100%';
                 otaStatus.textContent   = '✅ Done! Device is rebooting… reconnect in ~5s.';
