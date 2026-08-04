@@ -401,11 +401,11 @@
 
 
         const APP_VERSION = 'v0.4';
-        const SERVICE_UUID = '00001815-0000-1000-8000-00805f9b34fb';
-        const ROSTER_UUID  = '00002a59-0000-1000-8000-00805f9b34fb';
-        const COMMAND_UUID = '00002a57-0000-1000-8000-00805f9b34fb';
-        const STATE_UUID   = '00002a56-0000-1000-8000-00805f9b34fb';
-        const OTA_UUID     = '00002a58-0000-1000-8000-00805f9b34fb';
+        const SERVICE_UUID = 'b04d1815-4604-453d-8868-b7ec257c7426';
+        const ROSTER_UUID  = 'b04d2a59-4604-453d-8868-b7ec257c7426';
+        const COMMAND_UUID = 'b04d2a57-4604-453d-8868-b7ec257c7426';
+        const STATE_UUID   = 'b04d2a56-4604-453d-8868-b7ec257c7426';
+        const OTA_UUID     = 'b04d2a58-4604-453d-8868-b7ec257c7426';
 
         let bleDevice, gattServer;
         let rosterChar, commandChar, stateChar, otaChar;
@@ -1282,7 +1282,7 @@
         async function enterPairingMode() {
             try {
                 const payload = new Uint8Array([0x00, 0xE1, 0x01]);
-                await cmdChar.writeValueWithResponse(payload);
+                await queueGattWrite(payload);
                 alert('Pairing mode active for 60 seconds. Connect your new phone now.');
                 debugLog('Security: Entered 60s pairing mode');
             } catch (e) {
@@ -1300,7 +1300,7 @@
             
             try {
                 const payload = new Uint8Array([0x00, 0xE0, 0x01]);
-                await cmdChar.writeValueWithResponse(payload);
+                await queueGattWrite(payload);
                 alert('Device is resetting. Please reconnect in a few seconds.');
                 setTimeout(() => location.reload(), 3000);
             } catch (e) {
