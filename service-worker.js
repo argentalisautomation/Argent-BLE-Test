@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gateway-mesh-v20';
+const CACHE_NAME = 'gateway-mesh-v21';
 const urlsToCache = [
   './index.html',
   './manifest.json',
