@@ -1396,8 +1396,8 @@
                     pkt[0]          = 0x01;
                     pkt.set(data.subarray(sent, sent + chunkLen), 1);
                     
-                    // WriteWithoutResponse prevents Android GATT 133 crash
-                    await otaChar.writeValueWithoutResponse(pkt);
+                    // Fallback to WriteWithResponse to handle Android devices that reject WriteWithoutResponse
+                    await otaChar.writeValueWithResponse(pkt);
                     
                     sent += chunkLen;
 
@@ -1405,14 +1405,15 @@
                     progressBar.style.width = pct + '%';
                     otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
 
-                    // Strict 15ms pacing guarantees ESP32 has plenty of time to write and process Keep-Alives
-                    await new Promise(r => setTimeout(r, 15));
+                    // Strict 20ms pacing allows the Android Bluetooth IPC binder to breathe, 
+                    // completely preventing the GATT 133 crash that happens around 10%
+                    await new Promise(r => setTimeout(r, 20));
                 }
 
                 // ── COMMIT ─────────────────────────────────────────
                 otaStatus.textContent = 'Verifying & committing…';
                 const commitPkt = new Uint8Array([0x03]); // 0x03 = COMMIT AND RELAY
-                await otaChar.writeValueWithoutResponse(commitPkt);
+                await otaChar.writeValueWithResponse(commitPkt);
 
                 await otaChar.stopNotifications();
                 
