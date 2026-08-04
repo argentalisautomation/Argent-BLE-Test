@@ -380,7 +380,7 @@
 
 <body>
     <h1>Gateway Mesh</h1>
-    <div class="subtitle">v0.3 &middot; ESP-NOW + BLE + OTA</div>
+    <div class="subtitle">v0.4 &middot; ESP-NOW + BLE + OTA</div>
 
     <button id="connectBtn" class="main-btn">Connect Gateway</button>
     <div id="status">Ready</div>
@@ -400,7 +400,7 @@
         
 
 
-        const APP_VERSION = 'v0.3';
+        const APP_VERSION = 'v0.4';
         const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
         const ROSTER_UUID  = '12345678-1234-5678-1234-56789abcdef1';
         const COMMAND_UUID = '12345678-1234-5678-1234-56789abcdef2';
@@ -1158,25 +1158,45 @@
                                     </div>
                                 </div>
 
-                                <!-- Firmware Update -->
+                                ${dev.id === 0 ? `
+                                <!-- Firmware Update (Master only) -->
                                 <div class="settings-panel" style="margin-top:0; border-top:none; padding-top:0; border-left: 2px solid rgba(0, 210, 255, 0.4); padding-left: 12px; margin-left: 4px;">
                                     <div class="settings-header" onclick="document.getElementById('fw-${dev.id}').classList.toggle('expanded')">
-                                        <span>⚡ Firmware Update</span>
+                                        <span>⚡ Firmware Update (All Devices)</span>
                                         <span>▼</span>
                                     </div>
                                     <div class="settings-content" id="fw-${dev.id}">
                                         <div class="ota-panel" id="otaPanel-${dev.id}" style="display:block; padding:0; border:none; margin-top:0; background:transparent;">
-                                            <p>Select a <code>.bin</code> file built from <code>idf.py build</code>.<br>The device will reboot automatically after flashing.</p>
+                                            <p>Select a unified <code>.bin</code> file.<br>The Gateway will flash itself and then automatically relay the update to all active slaves.</p>
                                             <label class="ota-file-label" for="otaFileInput-${dev.id}" id="otaFileLabel-${dev.id}">📁 Tap to select firmware.bin</label>
                                             <input type="file" id="otaFileInput-${dev.id}" accept=".bin" style="display:none;" onchange="handleOtaFileSelect(event, ${dev.id})">
                                             <div class="ota-progress-wrap" id="otaProgressWrap-${dev.id}">
                                                 <div class="ota-progress-bar" id="otaProgressBar-${dev.id}"></div>
                                             </div>
                                             <div id="otaStatus-${dev.id}" class="ota-status-text"></div>
-                                            <button class="ota-flash-btn" id="otaFlashBtn-${dev.id}" onclick="flashFirmware(${dev.id})" disabled>Flash Firmware</button>
+                                            <button class="ota-flash-btn" id="otaFlashBtn-${dev.id}" onclick="flashFirmware(${dev.id})" disabled>Flash Gateway + Slaves</button>
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Security -->
+                                <div class="settings-panel" style="margin-top:0; border-top:none; padding-top:0; border-left: 2px solid rgba(255, 50, 50, 0.4); padding-left: 12px; margin-left: 4px;">
+                                    <div class="settings-header" onclick="document.getElementById('sec-${dev.id}').classList.toggle('expanded')">
+                                        <span>🔒 Security</span>
+                                        <span>▼</span>
+                                    </div>
+                                    <div class="settings-content" id="sec-${dev.id}">
+                                        <p style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:12px;">
+                                            Manage which phones can control this system.
+                                        </p>
+                                        <button class="action-btn" style="width:100%; margin-bottom:8px;" onclick="enterPairingMode()">
+                                            🔓 Allow New Phone (60s)
+                                        </button>
+                                        <button class="action-btn danger" style="width:100%; background: rgba(255,50,50,0.1); border-color: rgba(255,50,50,0.3); color: #ff6b6b;" onclick="factoryResetSecurity()">
+                                            🗑️ Forget All Pairings
+                                        </button>
+                                    </div>
+                                </div>` : ''}
 
                             </div>
                         </div> <!-- End Root Settings -->`;
@@ -1258,6 +1278,37 @@
             }
         }
 
+        
+        async function enterPairingMode() {
+            try {
+                const payload = new Uint8Array([0x00, 0xE1, 0x01]);
+                await cmdChar.writeValueWithResponse(payload);
+                alert('Pairing mode active for 60 seconds. Connect your new phone now.');
+                debugLog('Security: Entered 60s pairing mode');
+            } catch (e) {
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        async function factoryResetSecurity() {
+            const confirmed = confirm(
+                'This will forget ALL paired phones and disconnect you.\n\n' +
+                'You will need to reconnect and re-pair.\n\n' +
+                'Are you sure?'
+            );
+            if (!confirmed) return;
+            
+            try {
+                const payload = new Uint8Array([0x00, 0xE0, 0x01]);
+                await cmdChar.writeValueWithResponse(payload);
+                alert('Device is resetting. Please reconnect in a few seconds.');
+                setTimeout(() => location.reload(), 3000);
+            } catch (e) {
+                // Expected disconnect
+                setTimeout(() => location.reload(), 1000);
+            }
+        }
+
         async function flashFirmware(devId) {
             const fileInput = document.getElementById(`otaFileInput-${devId}`);
             const otaFile = fileInput.files[0];
@@ -1299,7 +1350,7 @@
                 debugLog(`OTA BEGIN: ${totalSize} bytes`);
 
                 // Short pause — give ESP time to open OTA partition
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 5000)); // 5 second wait for flash erase
 
                 // ── DATA CHUNKS ────────────────────────────────────
                 let sent = 0;
@@ -1323,7 +1374,7 @@
 
                 // ── COMMIT ─────────────────────────────────────────
                 otaStatus.textContent = 'Verifying & committing…';
-                const commitPkt = new Uint8Array([0x02]);
+                const commitPkt = new Uint8Array([0x03]); // 0x03 = COMMIT AND RELAY
                 await otaChar.writeValueWithResponse(commitPkt);
 
                 progressBar.style.width = '100%';
