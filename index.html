@@ -801,7 +801,7 @@
         async function sendRadarBasicValues(deviceId, minGate, maxGate, timeout, btnId) {
             const btn = document.getElementById(btnId);
             try {
-                if (btn) btn.disabled = true;
+                if (btn) { btn.disabled = true; btn.innerText = "⏳"; }
                 const payload = new Uint8Array(8);
                 payload[0] = deviceId;
                 payload[1] = 0xF8;
@@ -813,12 +813,15 @@
                 await new Promise(r => setTimeout(r, 1500));
                 await refreshRoster();
                 debugLog(`CMD: Radar Basic dev=${deviceId} min=${minGate} max=${maxGate} time=${timeout}`);
-                if (btn) {
-                    btn.innerText = '✓';
-                    setTimeout(() => { btn.innerText = 'Commit'; btn.disabled = false; }, 1000);
+                
+                const newBtn = document.getElementById(btnId);
+                if (newBtn) {
+                    newBtn.innerText = '✓';
+                    setTimeout(() => { newBtn.innerText = 'Commit'; newBtn.disabled = false; }, 1500);
                 }
             } catch (e) {
-                if (btn) btn.disabled = false;
+                const newBtn = document.getElementById(btnId);
+                if (newBtn) newBtn.disabled = false;
                 alert('Failed: ' + e.message);
             }
         }
@@ -827,14 +830,15 @@
             const gate = parseInt(document.getElementById(`gate-sel-${deviceId}`).value, 10);
             const move = parseInt(document.getElementById(`move-th-${deviceId}`).value, 10);
             const still = parseInt(document.getElementById(`still-th-${deviceId}`).value, 10);
-            const btn = document.getElementById(`btn-radar-thresh-${deviceId}`);
+            const btnId = `btn-radar-thresh-${deviceId}`;
+            const btn = document.getElementById(btnId);
             
             if (isNaN(move) || isNaN(still)) {
                 alert("Please enter valid numbers"); return;
             }
             
             try {
-                if (btn) btn.disabled = true;
+                if (btn) { btn.disabled = true; btn.innerText = "⏳ Saving..."; }
                 const payload = new Uint8Array(11);
                 payload[0] = deviceId;
                 payload[1] = 0xF7;
@@ -846,13 +850,15 @@
                 await new Promise(r => setTimeout(r, 1500));
                 await refreshRoster();
                 debugLog(`CMD: Radar Thresh dev=${deviceId} gate=${gate} move=${move} still=${still}`);
-                if (btn) {
-                    const old = btn.innerText; 
-                    btn.innerText = "✓ Applied & Verified"; 
-                    setTimeout(() => { btn.innerText = old; btn.disabled = false; }, 1500);
+                
+                const newBtn = document.getElementById(btnId);
+                if (newBtn) {
+                    newBtn.innerText = "✓ Applied & Verified"; 
+                    setTimeout(() => { newBtn.innerText = "Apply Thresholds"; newBtn.disabled = false; }, 2000);
                 }
             } catch (e) {
-                if (btn) btn.disabled = false;
+                const newBtn = document.getElementById(btnId);
+                if (newBtn) newBtn.disabled = false;
                 alert('Failed: ' + e.message);
             }
         }
@@ -948,6 +954,12 @@
         // Render UI
         // ============================================================
         function renderDevices() {
+            // Save state of expanded settings segments
+            const expandedIds = [];
+            document.querySelectorAll('.settings-content.expanded').forEach(el => {
+                if (el.id) expandedIds.push(el.id);
+            });
+
             deviceList.innerHTML = '';
             
             let allSwitchesOptions = ``;
@@ -1214,6 +1226,12 @@
 
                 deviceList.appendChild(card);
             });
+
+            // Restore state of expanded settings segments
+            expandedIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('expanded');
+            });
         }
 
         // ============================================================
@@ -1359,17 +1377,15 @@
                     const pkt       = new Uint8Array(1 + chunkLen);
                     pkt[0]          = 0x01;
                     pkt.set(data.subarray(sent, sent + chunkLen), 1);
-                    await otaChar.writeValueWithoutResponse(pkt);
+                    
+                    // WriteWithResponse provides protocol-level ACKs to prevent GATT timeouts
+                    await otaChar.writeValueWithResponse(pkt);
+                    
                     sent += chunkLen;
 
                     const pct = Math.round((sent / totalSize) * 100);
                     progressBar.style.width = pct + '%';
                     otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
-
-                    // Yield every ~16 KB to keep the UI responsive
-                    if (sent % (16 * 1024) < chunkLen) {
-                        await new Promise(r => setTimeout(r, 10));
-                    }
                 }
 
                 // ── COMMIT ─────────────────────────────────────────
