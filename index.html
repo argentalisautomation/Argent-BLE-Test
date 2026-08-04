@@ -1396,20 +1396,23 @@
                     pkt[0]          = 0x01;
                     pkt.set(data.subarray(sent, sent + chunkLen), 1);
                     
-                    // WriteWithResponse naturally throttles the loop to match flash write speed
-                    await otaChar.writeValueWithResponse(pkt);
+                    // WriteWithoutResponse prevents Android GATT 133 crash
+                    await otaChar.writeValueWithoutResponse(pkt);
                     
                     sent += chunkLen;
 
                     const pct = Math.round((sent / totalSize) * 100);
                     progressBar.style.width = pct + '%';
                     otaStatus.textContent   = `Flashing… ${pct}% (${(sent/1024).toFixed(0)} / ${(totalSize/1024).toFixed(0)} KB)`;
+
+                    // Strict 15ms pacing guarantees ESP32 has plenty of time to write and process Keep-Alives
+                    await new Promise(r => setTimeout(r, 15));
                 }
 
                 // ── COMMIT ─────────────────────────────────────────
                 otaStatus.textContent = 'Verifying & committing…';
                 const commitPkt = new Uint8Array([0x03]); // 0x03 = COMMIT AND RELAY
-                await otaChar.writeValueWithResponse(commitPkt);
+                await otaChar.writeValueWithoutResponse(commitPkt);
 
                 await otaChar.stopNotifications();
                 
