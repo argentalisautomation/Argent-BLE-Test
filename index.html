@@ -1350,6 +1350,9 @@
             btn.disabled = true;
             progressWrap.style.display = 'block';
             progressBar.style.width    = '0%';
+            
+            // Critical: stop polling so readValue() doesn't interleave with OTA data chunks
+            stopStatePolling();
 
             try {
                 const buffer    = await otaFile.arrayBuffer();
@@ -1441,6 +1444,7 @@
                 progressWrap.style.display = 'none';
                 btn.disabled = false;
                 debugLog('OTA error: ' + e.message);
+                startStatePolling();
             }
         }
 
